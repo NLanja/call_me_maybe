@@ -1,6 +1,7 @@
 import json
 from pydantic import BaseModel, ValidationError
 from pathlib import Path
+from typing import Any
 
 DATA_DEFAULTS: dict = {
     "functions_definition": "data/input/functions_definition.json",
@@ -26,6 +27,12 @@ class FunctionDefinition(BaseModel):
 
 class Prompt(BaseModel):
     prompt: str
+
+
+class FunctionCallResult(BaseModel):
+    prompt: str
+    name: str
+    parameters: dict[str, Any]
 
 
 def load_json_file(path, default_key_name=None):
@@ -101,3 +108,24 @@ def load_function_test(path=None):
     except ValidationError as error:
         display_validation_errors(error)
         raise JsonFileError("Invalid function definition data")
+
+
+
+def save_output(results: list[FunctionCallResult], path: str | None) -> None:
+    if not path:
+        path_to_write = DATA_DEFAULTS["output"]
+    else:
+        path_to_write = path
+
+    output_path = Path(path_to_write)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    data = [result.model_dump() for result in results]
+
+    try:
+        with open(output_path, "w", encoding="utf-8") as file:
+            json.dump(data, file, indent=2, ensure_ascii=False)
+    except PermissionError as error:
+        raise JsonFileError(
+            f"Permission denied: {output_path}"
+        )  from error
