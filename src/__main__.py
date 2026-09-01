@@ -5,10 +5,10 @@ import argparse
 
 # os.environ['HF_HOME'] = '/goinfre/lanasain/.cache/huggingface'
 
-os.environ.setdefault(
-    "HF_HOME",
-    f"/goinfre/{getpass.getuser()}/.cache/huggingface",
-)
+# os.environ.setdefault(
+#     "HF_HOME",
+#     f"/goinfre/{getpass.getuser()}/.cache/huggingface",
+# )
 
 from llm_sdk import Small_LLM_Model
 from .vocabulary import load_vocabulary
@@ -49,11 +49,16 @@ def main():
     args = parse_args()
 
     check = Small_LLM_Model()
-    list_fun = load_function_definitions("")
-    list_prompt = load_function_test("")
+    list_fun = load_function_definitions(args.functions_definition)
+    list_prompt = load_function_test(args.input)
 
     id_to_token, special_ids = load_vocabulary(check)
-    quote_ids = check.encode('"').tolist()[0]
+    
+    # quote_ids = check.encode('"').tolist()[0]
+    quote_ids = [
+        token_id for token_id, token in id_to_token.items()
+        if token == '"'
+    ]
 
     if len(quote_ids) != 1:
         raise RuntimeError(
@@ -63,13 +68,6 @@ def main():
         )
     
     quote_token_id = quote_ids[0]
-
-    if len(quote_ids) != 1:
-        raise RuntimeError(
-            f"Expected the double-quote character to map to a single "
-            f"token, got {len(quote_ids)} tokens: {quote_ids}. "
-            "The 'string' generation mode relies on this assumption."
-        )
 
     results = run_pipeline(
         model=check,
