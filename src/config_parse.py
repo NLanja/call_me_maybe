@@ -6,7 +6,7 @@ from typing import Any
 DATA_DEFAULTS: dict = {
     "functions_definition": "data/input/functions_definition.json",
     "function_calling_tests": "data/input/function_calling_tests.json",
-    "output": "data/output/output.json",
+    "output": "data/output/function_calling_results.json",
 }
 
 
