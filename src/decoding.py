@@ -31,10 +31,13 @@ def is_complete_choice(text: str, candidates: list[str]) -> bool:
 
 
 def filter_number(
+    prefix: str,
     id_to_token: dict[int, str],
     special_ids: set[int],
 ) -> list[int]:
     valid_ids = []
+    is_first_token = prefix == ""
+    has_dot = "." in prefix
 
     for token_id, token in id_to_token.items():
         if token_id in special_ids:
@@ -43,8 +46,23 @@ def filter_number(
         if not token:
             continue
 
-        if all(char in ALLOWED_NUMBER_CHARS for char in token):
-            valid_ids.append(token_id)
+        candidate = token
+        if is_first_token and candidate.startswith("Ġ"):
+            candidate = candidate[1:]
+
+        if not candidate:
+            continue
+
+        if not all(char in ALLOWED_NUMBER_CHARS for char in candidate):
+            continue
+
+        if has_dot and "." in candidate:
+            continue
+
+        if "-" in candidate and not is_first_token:
+            continue
+
+        valid_ids.append(token_id)
 
     return valid_ids
 
@@ -58,18 +76,21 @@ def is_valid_number(text: str) -> bool:
 
 
 def filter_string(
+    prefix: str,
     id_to_token: dict[int, str],
     special_ids: set[int],
     end_token_id: int,
 ) -> list[int]:
     valid_ids = []
+    is_first_token = prefix == ""
 
     for token_id, token in id_to_token.items():
         if token_id in special_ids:
             continue
 
         if token_id == end_token_id:
-            valid_ids.append(token_id)
+            if not is_first_token:
+                valid_ids.append(token_id)
             continue
 
         if '"' not in token:
@@ -118,10 +139,25 @@ def generate_constrained(
                 special_ids,
             )
         elif mode == "number":
-            valid_ids = filter_number(id_to_token, special_ids)
+            valid_ids = filter_number(raw_text, id_to_token, special_ids)
+
+            if is_valid_number(raw_text):
+                unconstrained_best = max(
+                    range(len(logits)), key=lambda i: logits[i]
+                )
+                best_token = id_to_token.get(unconstrained_best, "")
+                best_char = (
+                    best_token[1:] if best_token.startswith("Ġ") else best_token
+                )
+                if not best_char or not all(
+                    char in ALLOWED_NUMBER_CHARS for char in best_char
+                ):
+                    break
         else:
             assert end_token_id is not None
-            valid_ids = filter_string(id_to_token, special_ids, end_token_id)
+            valid_ids = filter_string(
+                raw_text, id_to_token, special_ids, end_token_id
+            )
 
         if not valid_ids:
             break
@@ -142,11 +178,11 @@ def generate_constrained(
             if is_complete_choice(raw_text, candidates):
                 break
 
-    new_ids = input_ids[start_len]
+    new_ids = input_ids[start_len:]
 
     if mode == "closed":
         generated_text = raw_text
     else:
-        generated_text = model.decode(new_ids) if new_ids else ""
+        generated_text = model.decode(new_ids) if len(new_ids) > 0 else ""
 
     return generated_text, input_ids
