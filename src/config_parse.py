@@ -1,9 +1,12 @@
+"""Utilities for loading and validating JSON data."""
+
+
 import json
 from pydantic import BaseModel, ValidationError
 from pathlib import Path
 from typing import Any
 
-DATA_DEFAULTS: dict = {
+DATA_DEFAULTS: dict[str, str] = {
     "functions_definition": "data/input/functions_definition.json",
     "function_calling_tests": "data/input/function_calling_tests.json",
     "output": "data/output/function_calling_results.json",
@@ -15,10 +18,14 @@ class JsonFileError(Exception):
 
 
 class DataType(BaseModel):
+    """Represent a function parameter or return type."""
+
     type: str
 
 
 class FunctionDefinition(BaseModel):
+    """Represent a function definition and its parameters."""
+
     name: str
     description: str
     parameters: dict[str, DataType]
@@ -26,17 +33,41 @@ class FunctionDefinition(BaseModel):
 
 
 class Prompt(BaseModel):
+    """Represent a function-calling test prompt."""
+
     prompt: str
 
 
 class FunctionCallResult(BaseModel):
+    """Represent the result of a function-calling test."""
+
     prompt: str
     name: str
     parameters: dict[str, Any]
 
 
-def load_json_file(path, default_key_name=None):
+def load_json_file(
+    path: str | None = None,
+    default_key_name: str | None = None,
+) -> Any:
+    """Load and parse a JSON file.
+
+    Args:
+        path: Path to the JSON file. If not provided, the default path
+            associated with `default_key_name` is used.
+        default_key_name: Key used to retrieve the default file path
+            from `DATA_DEFAULTS`.
+
+    Returns:
+        The parsed JSON data.
+
+    Raises:
+        JsonFileError: If the file is invalid, the file does not
+            exist, access is denied, or JSON content is invalid.
+    """
     if not path:
+        if default_key_name is None:
+            raise JsonFileError("No file path or default key provided.")
         path_to_open = DATA_DEFAULTS[default_key_name]
     else:
         path_to_open = path
@@ -66,7 +97,14 @@ def load_json_file(path, default_key_name=None):
         ) from error
 
 
-def display_validation_errors(error):
+def display_validation_errors(error: ValidationError) -> None:
+    """Display Pydantic validation errors in a readable format.
+
+    Args:
+        error: Pydantic validation error containing the invalid fields
+            and their corresponding error messages.
+
+    """
     for err in error.errors():
         loc = ".".join(str(value) for value in err["loc"])
         msg = err["msg"]
@@ -74,7 +112,22 @@ def display_validation_errors(error):
         print(f"Invalid field '{loc}': {msg}")
 
 
-def load_function_definitions(path=None):
+def load_function_definitions(
+    path: str | None = None
+) -> list[FunctionDefinition]:
+    """Load and validate function definitions from a JSON file.
+
+    Args:
+        path: Path to the JSON file. If not provided, the default
+            function definition file is used.
+
+    Returns:
+        A list of validated `FunctionDefinition` objects.
+
+    Raises:
+        JsonFileError: If the JSON file cannot be loaded or contains
+            invalid function definition data.
+    """
     data = load_json_file(
         path,
         "functions_definition"
@@ -88,10 +141,25 @@ def load_function_definitions(path=None):
         return functions
     except ValidationError as error:
         display_validation_errors(error)
-        raise JsonFileError("Invalid function definition data")
+        raise JsonFileError("Invalid function definition data.")
 
 
-def load_function_test(path=None):
+def load_function_test(
+    path: str | None = None
+) -> list[Prompt]:
+    """Load and validate function-calling tests from a JSON file.
+
+    Args:
+        path: Path to the JSON file. If not provided, the default
+            function-calling test file is used.
+
+    Returns:
+        A list of validated `Prompt` objects.
+
+    Raises:
+        JsonFileError: If the JSON file cannot be loaded or contains
+            invalid test data.
+    """
     data = load_json_file(
         path,
         "function_calling_tests"
@@ -107,11 +175,21 @@ def load_function_test(path=None):
 
     except ValidationError as error:
         display_validation_errors(error)
-        raise JsonFileError("Invalid function definition data")
-
+        raise JsonFileError("Invalid input data.")
 
 
 def save_output(results: list[FunctionCallResult], path: str | None) -> None:
+    """Save function-calling results to a JSON file.
+
+    Args:
+        results: List of function-calling results to save.
+        path: Path to the output JSON file. If not provided, the default
+            output path is used.
+
+    Raises:
+        JsonFileError: If the output file cannot be written because
+            permission is denied.
+    """
     if not path:
         path_to_write = DATA_DEFAULTS["output"]
     else:
@@ -128,4 +206,4 @@ def save_output(results: list[FunctionCallResult], path: str | None) -> None:
     except PermissionError as error:
         raise JsonFileError(
             f"Permission denied: {output_path}"
-        )  from error
+        ) from error
