@@ -1,8 +1,18 @@
+"""Utilities for loading model vocabulary and tokenizer data."""
+
 from typing import Any
 from .config_parse import load_json_file
 
 
 def load_vocabulary(model: Any) -> tuple[dict[int, str], set[int]]:
+    """Load the model vocabulary and special token ID.
+
+    Args:
+        model: Model used to locate vocabulary and tokenizer files.
+
+    Returns:
+        A mapping of token ID to tokens and a set of special token ID.
+    """
     vocab_path = model.get_path_to_vocab_file()
     vocab = load_json_file(vocab_path)
     id_to_token = {token_id: token for token, token_id in vocab.items()}
