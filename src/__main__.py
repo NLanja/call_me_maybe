@@ -1,28 +1,50 @@
-import sys
-import os
-import getpass
+"""Command-line entry point for the function calling tool.
+
+This module parses command-line arguments and runs the function calling
+pipeline using constrained decoding.
+"""
+
 import argparse
+import sys
+from pathlib import Path
 
-# os.environ['HF_HOME'] = '/goinfre/lanasain/.cache/huggingface'
-
-# os.environ.setdefault(
-#     "HF_HOME",
-#     f"/goinfre/{getpass.getuser()}/.cache/huggingface",
-# )
-
-from llm_sdk import Small_LLM_Model
-from .vocabulary import load_vocabulary
-from .generator import run_pipeline
 from .config_parse import (
+    JsonFileError,
     load_function_definitions,
     load_function_test,
-    JsonFileError,
-    save_output)
+    save_output,
+)
+from .generator import run_pipeline
+from .vocabulary import load_vocabulary
+
+
+def validate_json_path(path: str) -> str:
+    """Validate that a file path has a JSON extension.
+
+    Args:
+        path: File path to validate.
+
+    Returns:
+        The validated file path.
+
+    Raises:
+        argparse.ArgumentTypeError: If the file is not a JSON file.
+    """
+    if Path(path).suffix.lower() != ".json":
+        raise argparse.ArgumentTypeError(
+            f"Invalid file format: {path}. Expected a .json file."
+        )
+    return path
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments.
+
+    Returns:
+        parsed command-line arguments.
+    """
     parser = argparse.ArgumentParser(
-        description = "Function calling tool using constrained decodimg."
+        description="Function calling tool using constrained decoding."
     )
 
     parser.add_argument(
@@ -39,69 +61,95 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument(
         "--output",
-        type=str,
+        type=validate_json_path,
         help="Path to the output JSON File to generate"
     )
 
     return parser.parse_args()
 
-def main():
+
+def main() -> None:
+    """Run the function calling pipeline.
+
+    Loads input data, processes prompts, and saves the generated results.
+    Any keyboard interruption is caught here so the program
+    always exits cleanly instead of printing a raw traceback.
+    """
     args = parse_args()
 
-    check = Small_LLM_Model()
-    list_fun = load_function_definitions(args.functions_definition)
-    list_prompt = load_function_test(args.input)
+    try:
+        _run(args)
+    except KeyboardInterrupt:
+        print("\nInterrupted by user. Exiting.")
+        sys.exit(130)
 
-    id_to_token, special_ids = load_vocabulary(check)
-    
-    # quote_ids = check.encode('"').tolist()[0]
+
+def _run(args: argparse.Namespace) -> None:
+    """Load inputs, run the pipeline, and save the results.
+
+    Args:
+        args: Parsed command-line argumenrts
+    """
+    try:
+        list_fun = load_function_definitions(args.functions_definition)
+        list_prompt = load_function_test(args.input)
+    except JsonFileError as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+
+    try:
+        from llm_sdk import Small_LLM_Model
+        model = Small_LLM_Model()
+    except Exception as e:
+        print(f"Error: failed to load the LLM model: {e}")
+        sys.exit(1)
+
+    try:
+        id_to_token, special_ids = load_vocabulary(model)
+    except JsonFileError as e:
+        print(f"Error: failed to load model vocabulary: {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error: unexpected failure while loading vocabulary: {e}")
+        sys.exit(1)
+
     quote_ids = [
         token_id for token_id, token in id_to_token.items()
         if token == '"'
     ]
 
     if len(quote_ids) != 1:
-        raise RuntimeError(
-            f"Expected the double-quote character to map to a single "
-            f"token, got {len(quote_ids)} tokens: {quote_ids}. "
+        print(
+            "Error: expected the double-quote character to map to a "
+            f"single token, got {len(quote_ids)} tokens: {quote_ids}. "
             "The 'string' generation mode relies on this assumption."
         )
-    
+        sys.exit(1)
+
     quote_token_id = quote_ids[0]
 
-    results = run_pipeline(
-        model=check,
-        functions=list_fun,
-        prompts=list_prompt,
-        id_to_token=id_to_token,
-        special_ids=special_ids,
-        quote_token_id=quote_token_id,
-    )
+    try:
+        results = run_pipeline(
+            model=model,
+            functions=list_fun,
+            prompts=list_prompt,
+            id_to_token=id_to_token,
+            special_ids=special_ids,
+            quote_token_id=quote_token_id,
+        )
+    except Exception as e:
+        print(f"Error: unexpected failure while processing prompts: {e}")
+        sys.exit(1)
 
-    save_output(results, args.output)
+    try:
+        save_output(results, args.output)
+    except JsonFileError as e:
+        print(f"Error: {e}")
+        sys.exit(1)
 
-    print(f"Done: {len(results)}/{len(list_prompt)} prompts processed successfully.")
-#     lists = []
-#     for a in range(len(list_fun)):
-#         lists.append(list_fun[a].name)
-#     # print(lists)
+    print(f"Done: {len(results)}/{len(list_prompt)} "
+          "prompts processed successfully.")
 
-#     for i in range(len(list_prompt)):
-#         a = check.encode(f"Here is my prompt '{list_prompt[i].prompt}' and the list of functions '{lists}'; just give me the name of the function that corresponds to my prompt in the list of functions.")
-#         encode = a[0].tolist()
-#         lenght = len(encode)
-
-#         num_tokens_to_generate = 10
-
-#         for _ in range(num_tokens_to_generate):
-#             logit = check.get_logits_from_input_ids(encode)
-#             response = max(range(len(logit)), key=lambda i: logit[i])
-#             encode.append(response)
-
-#         deco = check.decode(encode[lenght:])
-#         print(deco)
-#         print(list_prompt[i].prompt)
 
 if __name__ == "__main__":
     main()
-    # print(getpass.getuser())
