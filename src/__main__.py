@@ -65,6 +65,13 @@ def parse_args() -> argparse.Namespace:
         help="Path to the output JSON File to generate"
     )
 
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="Qwen/Qwen3-0.6B",
+        help="Model identifier to use for inference. Default is Qwen/Qwen3-0.6B."
+    )
+
     return parser.parse_args()
 
 
@@ -99,9 +106,9 @@ def _run(args: argparse.Namespace) -> None:
 
     try:
         from llm_sdk import Small_LLM_Model
-        model = Small_LLM_Model()
+        model = Small_LLM_Model(model_name=args.model)
     except Exception as e:
-        print(f"Error: failed to load the LLM model: {e}")
+        print(f"Error: failed to load the LLM model '{args.model}': {e}")
         sys.exit(1)
 
     try:
