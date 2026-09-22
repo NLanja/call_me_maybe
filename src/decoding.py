@@ -245,6 +245,7 @@ def generate_constrained(
     candidates: list[str] | None = None,
     end_token_id: int | None = None,
     max_tokens: int = MAX_TOKENS,
+    trace: bool = False,
 ) -> tuple[str, list[int]]:
     """Generate text with constrained token selection.
 
@@ -283,6 +284,11 @@ def generate_constrained(
 
     for step in range(max_tokens):
         logits = model.get_logits_from_input_ids(input_ids)
+
+        if trace:
+            # show a short trace of the current generation state
+            print(f"[TRACE] step={step} prefix='{raw_text[:80]}' tokens_generated={len(input_ids)-start_len}")
+            # compute top choices among valid ids once computed below
 
         if mode == "closed":
             assert candidates is not None
@@ -329,6 +335,14 @@ def generate_constrained(
                 raw_text, id_to_token, special_ids, end_token_id
             )
 
+        if trace:
+            # show how many valid ids we have and top scoring tokens
+            print(f"[TRACE] valid_ids_count={len(valid_ids)}")
+            if valid_ids:
+                scored = sorted(valid_ids, key=lambda i: logits[i], reverse=True)[:5]
+                tops = [f"{id_to_token.get(i,'')}({logits[i]:.2f})" for i in scored]
+                print(f"[TRACE] top_valid_tokens={tops}")
+
         if not valid_ids:
             break
 
@@ -340,6 +354,10 @@ def generate_constrained(
         if mode == "string" and next_id == end_token_id:
             string_terminated = True
             break
+
+            if trace:
+                tok = id_to_token.get(next_id, '')
+                print(f"[TRACE] chosen_token_id={next_id} token={tok} score={logits[next_id]:.2f}")
 
         raw_text += id_to_token[next_id]
         input_ids = input_ids + [next_id]

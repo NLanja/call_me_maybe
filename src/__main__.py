@@ -72,6 +72,12 @@ def parse_args() -> argparse.Namespace:
         help="Model identifier to use for inference. Default is Qwen/Qwen3-0.6B."
     )
 
+    parser.add_argument(
+        "--trace",
+        action="store_true",
+        help="Enable token-level generation trace output for debugging",
+    )
+
     return parser.parse_args()
 
 
@@ -143,6 +149,7 @@ def _run(args: argparse.Namespace) -> None:
             id_to_token=id_to_token,
             special_ids=special_ids,
             quote_token_id=quote_token_id,
+            trace=args.trace,
         )
     except Exception as e:
         print(f"Error: unexpected failure while processing prompts: {e}")

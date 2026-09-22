@@ -56,6 +56,7 @@ def choose_function_name(
     functions_by_name: dict[str, FunctionDefinition],
     id_to_token: dict[int, str],
     special_ids: set[int],
+    trace: bool = False,
 ) -> str:
     """Choose the function matching the user request.
 
@@ -97,6 +98,7 @@ def choose_function_name(
         special_ids=special_ids,
         mode="closed",
         candidates=function_names,
+        trace=trace,
     )
 
     return name
@@ -114,6 +116,7 @@ def generate_parameter_value(
     id_to_token: dict[int, str],
     special_ids: set[int],
     quote_token_id: int,
+    trace: bool = False,
 ) -> Any:
     """Extract a parameter value from the user's request.
 
@@ -172,6 +175,7 @@ def generate_parameter_value(
             special_ids=special_ids,
             mode="string",
             end_token_id=quote_token_id,
+            trace=trace,
         )
         return text
 
@@ -188,6 +192,7 @@ def generate_parameter_value(
             special_ids=special_ids,
             mode="closed",
             candidates=["true", "false"],
+            trace=trace,
         )
         return text == "true"
 
@@ -198,6 +203,7 @@ def generate_parameter_value(
             id_to_token=id_to_token,
             special_ids=special_ids,
             mode="number",
+            trace=trace,
         )
         if not is_valid_number(text):
             raise ValueError(
@@ -213,6 +219,7 @@ def generate_parameter_value(
             id_to_token=id_to_token,
             special_ids=special_ids,
             mode="integer",
+            trace=trace,
         )
 
         if not is_valid_integer(text):
@@ -232,6 +239,7 @@ def process_prompt(
     id_to_token: dict[int, str],
     special_ids: set[int],
     quote_token_id: int,
+    trace: bool = False,
 ) -> FunctionCallResult:
     """Process a user prompt into a function call.
 
@@ -246,7 +254,8 @@ def process_prompt(
         quote_token_id: Token ID used for string values.
     """
     chosen_name = choose_function_name(
-        model, prompt.prompt, functions_by_name, id_to_token, special_ids
+        model, prompt.prompt, functions_by_name, id_to_token, special_ids,
+        trace=trace,
     )
 
     function_def = functions_by_name[chosen_name]
@@ -265,6 +274,7 @@ def process_prompt(
             id_to_token=id_to_token,
             special_ids=special_ids,
             quote_token_id=quote_token_id,
+            trace=trace,
         )
 
     return FunctionCallResult(
@@ -281,6 +291,7 @@ def run_pipeline(
     id_to_token: dict[int, str],
     special_ids: set[int],
     quote_token_id: int,
+    trace: bool = False,
 ) -> list[FunctionCallResult]:
     functions_by_name = build_functions_index(functions)
     results: list[FunctionCallResult] = []
@@ -295,6 +306,7 @@ def run_pipeline(
                 id_to_token=id_to_token,
                 special_ids=special_ids,
                 quote_token_id=quote_token_id,
+                trace=trace,
             )
             results.append(result)
             display_result(index, total, result)
