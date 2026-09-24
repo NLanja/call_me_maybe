@@ -1,3 +1,6 @@
+"""Helpers for displaying function-calling results in the terminal."""
+
+
 import json
 from .config_parse import FunctionCallResult
 
@@ -5,7 +8,7 @@ from .config_parse import FunctionCallResult
 def display_result(
     index: int, total: int, result: FunctionCallResult
 ) -> None:
-    """Pretty-print a single function-cqlling result to the terminal.
+    """Print a single function-calling result to the terminal.
 
     Args:
         index: 1-based position of this result among all prompts.
