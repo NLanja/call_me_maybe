@@ -69,7 +69,8 @@ def parse_args() -> argparse.Namespace:
         "--model",
         type=str,
         default="Qwen/Qwen3-0.6B",
-        help="Model identifier to use for inference. Default is Qwen/Qwen3-0.6B."
+        help="Model identifier to use for inference."
+             "Default is Qwen/Qwen3-0.6B."
     )
 
     parser.add_argument(
