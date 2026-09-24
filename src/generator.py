@@ -255,7 +255,7 @@ def process_prompt(
     """
     chosen_name = choose_function_name(
         model, prompt.prompt, functions_by_name, id_to_token, special_ids,
-        trace=trace,
+        trace=trace
     )
 
     function_def = functions_by_name[chosen_name]
