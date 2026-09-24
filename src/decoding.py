@@ -7,10 +7,7 @@ closed choices, numbers, and strings.
 
 from typing import Any
 
-MAX_TOKENS = 12
-MIN_STRING_TOKENS = 16
-MAX_STRING_TOKENS = 256
-STRING_TOKEN_MARGIN = 4
+MAX_TOKENS = 30
 ALLOWED_NUMBER_CHARS = set("0123456789.-")
 ALLOWED_INTEGER_CHARS = set("0123456789-")
 FORBIDDEN_STRING_CHARS = set('"\n<>Ċ')
@@ -189,36 +186,6 @@ def filter_string(
     return valid_ids
 
 
-def compute_string_max_tokens(model: Any, source_text: str) -> int:
-    """Compute a token budget for string extraction, sized to the input.
-
-    An extracted string parameter can never be longer than the text it
-    was extracted from. Sizing the generation budget on the length of
-    `source_text` (instead of using a fixed constant) avoids truncating
-    long, legitimate values while avoiding wasted forward passes -
-    unlike closed/number/integer modes, string mode has no cheap
-    early-stop signal other than reaching the closing quote, and the
-    SDK does not cache past key values, so every wasted step recomputes
-    attention over the whole growing sequence.
-
-    Args:
-        model: Model used to tokenize `source_text`.
-        source_text: Text the string parameter is expected to be
-            extracted from (typically the user prompt).
-
-    Returns:
-        Token budget, clamped between `MIN_STRING_TOKENS` and
-        `MAX_STRING_TOKENS`.
-    """
-    try:
-        token_count = len(model.encode(source_text).tolist()[0])
-    except Exception:
-        token_count = MIN_STRING_TOKENS
-
-    budget = token_count + STRING_TOKEN_MARGIN
-    return max(MIN_STRING_TOKENS, min(budget, MAX_STRING_TOKENS))
-
-
 def get_best_token(logits: list[float], valid_ids: list[int]) -> int | None:
     """Get the highest-scoring valid token.
 
@@ -244,7 +211,6 @@ def generate_constrained(
     mode: str,
     candidates: list[str] | None = None,
     end_token_id: int | None = None,
-    max_tokens: int = MAX_TOKENS,
     trace: bool = False,
 ) -> tuple[str, list[int]]:
     """Generate text with constrained token selection.
@@ -257,9 +223,6 @@ def generate_constrained(
         mode: Generation mode: closed, number, integer or string.
         candidates: List of choices for closed mode.
         end_token_id: Termination token for string mode.
-        max_tokens: Maximum number of tokens to generate. Defaults to
-            `MAX_TOKENS`; pass a value from `compute_string_max_tokens`
-            for string mode to size the budget to the input.
 
     Returns:
         Generated text and complete token IDs.
@@ -280,15 +243,13 @@ def generate_constrained(
 
     raw_text = ""
     start_len = len(input_ids)
-    string_terminated = False
 
-    for step in range(max_tokens):
+    for step in range(MAX_TOKENS):
         logits = model.get_logits_from_input_ids(input_ids)
 
         if trace:
-            # show a short trace of the current generation state
-            print(f"[TRACE] step={step} prefix='{raw_text[:80]}' tokens_generated={len(input_ids)-start_len}")
-            # compute top choices among valid ids once computed below
+            print(f"[TRACE] step={step} prefix='{raw_text[:80]}'"
+                  f" tokens_generated={len(input_ids)-start_len}")
 
         if mode == "closed":
             assert candidates is not None
@@ -336,11 +297,18 @@ def generate_constrained(
             )
 
         if trace:
-            # show how many valid ids we have and top scoring tokens
             print(f"[TRACE] valid_ids_count={len(valid_ids)}")
             if valid_ids:
-                scored = sorted(valid_ids, key=lambda i: logits[i], reverse=True)[:5]
-                tops = [f"{id_to_token.get(i,'')}({logits[i]:.2f})" for i in scored]
+                scored = sorted(
+                    valid_ids,
+                    key=lambda i: logits[i],
+                    reverse=True
+                )[:5]
+
+                tops = [
+                    f"{id_to_token.get(i, '')}({logits[i]:.2f})"
+                    for i in scored
+                ]
                 print(f"[TRACE] top_valid_tokens={tops}")
 
         if not valid_ids:
@@ -352,12 +320,12 @@ def generate_constrained(
             break
 
         if mode == "string" and next_id == end_token_id:
-            string_terminated = True
             break
 
             if trace:
                 tok = id_to_token.get(next_id, '')
-                print(f"[TRACE] chosen_token_id={next_id} token={tok} score={logits[next_id]:.2f}")
+                print(f"[TRACE] chosen_token_id={next_id} "
+                      f"token={tok} score={logits[next_id]:.2f}")
 
         raw_text += id_to_token[next_id]
         input_ids = input_ids + [next_id]
@@ -366,13 +334,6 @@ def generate_constrained(
             assert candidates is not None
             if is_complete_choice(raw_text, candidates):
                 break
-
-    if mode == "string" and not string_terminated:
-        raise ValueError(
-            "String generation did not reach the closing quote within "
-            f"the {max_tokens}-token budget; refusing to return a "
-            "truncated value."
-        )
 
     new_ids = input_ids[start_len:]
 
