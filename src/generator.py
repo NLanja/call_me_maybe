@@ -5,7 +5,6 @@ user prompts using constrained model generation.
 """
 
 
-import re
 from typing import Any
 from .config_parse import FunctionDefinition, Prompt, FunctionCallResult
 from .decoding import generate_constrained, is_valid_number, is_valid_integer
@@ -139,31 +138,6 @@ def generate_parameter_value(
     Returns:
         Extracter parameter value.
     """
-    if param_name == "source_string":
-        special_instruction = (
-            "Extract the exact source text from the request. "
-            "Keep the original casing, spaces, punctuation, and quotes "
-            "as they appear in the prompt. Return only the raw string "
-            "value, with no explanation."
-        )
-    elif param_name == "regex":
-        special_instruction = (
-            "Extract a single valid regex pattern only. "
-            "Do not add quotes, comments, or explanation. "
-            "Prefer the simplest pattern that matches the request."
-        )
-    elif param_name == "replacement":
-        special_instruction = (
-            "Extract only the literal replacement value mentioned in the "
-            "prompt. Preserve its exact casing and spelling. "
-            "Return only the raw replacement value."
-        )
-    else:
-        special_instruction = (
-            "Extract the raw parameter value from the request. "
-            "Return only the value with no explanation."
-        )
-
     system_message = (
         "You are a function-calling assistant. The function to call has "
         "already been chosen; your only job now is to extract its raw "
@@ -171,7 +145,8 @@ def generate_parameter_value(
         f"Chosen function: \"{function_name}\" - {function_description}.\n"
         "you must NOT pre-compute or answer the user's question "
         "yourself.\n"
-        f"{special_instruction}\n"
+        "For regex, provide a single, valid, generic, "
+        "and reusable regex pattern.\n"
         "Respond with only the value, nothing else - "
         "no explanation.\n"
     )
@@ -189,7 +164,6 @@ def generate_parameter_value(
     )
 
     if param_type == "string":
-
         instruction = build_chat_prompt(system_message, user_message)
         input_ids = model.encode(instruction).tolist()[0]
         input_ids = input_ids + [quote_token_id]
@@ -319,10 +293,25 @@ def run_pipeline(
     quote_token_id: int,
     trace: bool = False,
 ) -> list[FunctionCallResult]:
+    """Process prompts using constrained decoding.
+
+    Generates function calls and collects the results for each prompt.
+
+    Args:
+        model: Model used for generation.
+        functions: Function definitions.
+        prompts: Prompts to process.
+        id_to_token: Mapping of token ID to token strings.
+        special_ids: ID of special tokens.
+        quote_token_id: ID of the quote token.
+        trace: Whether to display token-level generation traces.
+
+    Returns:
+        Results generated for each processed prompt.
+    """
     functions_by_name = build_functions_index(functions)
     results: list[FunctionCallResult] = []
     total = len(prompts)
-
     for index, prompt in enumerate(prompts, start=1):
         try:
             result = process_prompt(
