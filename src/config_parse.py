@@ -2,7 +2,7 @@
 
 
 import json
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, ConfigDict
 from pathlib import Path
 from typing import Any
 
@@ -30,12 +30,14 @@ class FunctionDefinition(BaseModel):
     description: str
     parameters: dict[str, DataType]
     returns: DataType
+    model_config = ConfigDict(extra="forbid")
 
 
 class Prompt(BaseModel):
     """Represent a function-calling test prompt."""
 
     prompt: str
+    model_config = ConfigDict(extra="forbid")
 
 
 class FunctionCallResult(BaseModel):
@@ -44,6 +46,7 @@ class FunctionCallResult(BaseModel):
     prompt: str
     name: str
     parameters: dict[str, Any]
+    model_config = ConfigDict(extra="forbid")
 
 
 def load_json_file(
