@@ -7,7 +7,7 @@ closed choices, numbers, and strings.
 
 from typing import Any
 
-MAX_TOKENS = 30
+MAX_TOKENS = 50
 ALLOWED_NUMBER_CHARS = set("0123456789.-")
 ALLOWED_INTEGER_CHARS = set("0123456789-")
 FORBIDDEN_STRING_CHARS = set('"\n<>Ċ')
@@ -139,9 +139,7 @@ def is_valid_integer(text: str) -> bool:
 
     Returns:
         True if the text is a valid integer.
-
     """
-
     try:
         int(text)
         return True
@@ -319,13 +317,13 @@ def generate_constrained(
         if next_id is None:
             break
 
+        if trace:
+            tok = id_to_token.get(next_id, '')
+            print(f"[TRACE] chosen_token_id={next_id} "
+                  f"token={tok} score={logits[next_id]:.2f}")
+
         if mode == "string" and next_id == end_token_id:
             break
-
-            if trace:
-                tok = id_to_token.get(next_id, '')
-                print(f"[TRACE] chosen_token_id={next_id} "
-                      f"token={tok} score={logits[next_id]:.2f}")
 
         raw_text += id_to_token[next_id]
         input_ids = input_ids + [next_id]
