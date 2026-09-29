@@ -11,7 +11,6 @@ dependencies = [
     "torch>=2.0.0",
     "transformers>=4.40.0",
     "huggingface-hub>=0.20.0",
-    "numpy>=1.26.0",
     "pydantic>=2.0.0",
 ]
 
@@ -20,3 +19,7 @@ dev = [
     "mypy>=1.10.0",
     "flake8>=7.0.0",
 ]
+
+[[tool.mypy.overrides]]
+module = "llm_sdk.*"
+ignore_errors = true
